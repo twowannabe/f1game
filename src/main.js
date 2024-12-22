@@ -1,87 +1,26 @@
-class IntroScene extends Phaser.Scene {
-    constructor() {
-        super({ key: 'IntroScene' });
-    }
-
-    preload() {
-        // Загрузка слайдов
-        this.load.image('slide1', 'assets/slide1.jpeg');
-        this.load.image('slide2', 'assets/slide2.jpeg');
-        this.load.image('slide3', 'assets/slide3.jpeg');
-    }
-
-    create() {
-        const slides = ['slide1', 'slide2', 'slide3'];
-        let currentSlide = 0;
-
-        // Функция отображения слайда
-        const showSlide = (index) => {
-            // Удаляем предыдущий слайд
-            if (this.currentImage) {
-                this.currentImage.destroy();
-                this.currentText.destroy();
-                this.nextButton.destroy();
-            }
-
-            // Добавляем изображение
-            this.currentImage = this.add.image(400, 300, slides[index]).setScale(0.8);
-
-            // Добавляем текст
-            const texts = [
-                'Добро пожаловать в наше приключение!',
-                'Остерегайтесь врагов на пути.',
-                'Нажмите кнопку, чтобы начать игру!',
-            ];
-            this.currentText = this.add.text(400, 500, texts[index], {
-                font: '20px Arial',
-                fill: '#ffffff',
-            }).setOrigin(0.5);
-
-            // Добавляем кнопку
-            this.nextButton = this.add.text(700, 550, 'Далее >>', {
-                font: '18px Arial',
-                fill: '#ffffff',
-                backgroundColor: '#000',
-                padding: { x: 10, y: 5 },
-            }).setInteractive();
-
-            // Обработчик нажатия кнопки
-            this.nextButton.on('pointerdown', () => {
-                currentSlide++;
-                if (currentSlide < slides.length) {
-                    showSlide(currentSlide);
-                } else {
-                    this.scene.start('MainScene'); // Переход к основной сцене
-                }
-            });
-        };
-
-        // Показать первый слайд
-        showSlide(currentSlide);
-    }
-}
-
 class MainScene extends Phaser.Scene {
     constructor() {
-        super({ key: 'MainScene' });
+        super({ key: 'MainScene'    });
     }
 
     preload() {
         // Загрузка ресурсов
         this.load.image('ground', 'assets/medievalTile_002.png');
-        this.load.image('run0', 'assets/char/character_maleAdventurer_run0.png');
-        this.load.image('run1', 'assets/char/character_maleAdventurer_run1.png');
-        this.load.image('run2', 'assets/char/character_maleAdventurer_run2.png');
-        // Загрузка фоновой картинки
+
+        // Две машинки (замените пути к своим файлам)
+        this.load.image('car1', 'assets/car1.png');
+        this.load.image('car2', 'assets/car2.png');
+
+        // Загрузка фона
         this.load.image('background', 'assets/trainroad.png');
     }
 
     create() {
-        // Создание прокручивающегося фона
-        this.background = this.add.tileSprite(0, 0, this.sys.game.config.width, this.sys.game.config.height, 'background');
-        this.background.setOrigin(0, 0); // Устанавливаем начало координат
+        // Фоновое изображение (тайлспрайт для вертикальной прокрутки)
+        this.background = this.add.tileSprite(400, 300, this.sys.game.config.width, this.sys.game.config.height, 'background');
+        this.background.setOrigin(0.5, 0.5);
 
-        // Земля
+        // Создаем землю
         const platforms = this.physics.add.staticGroup();
         const tileWidth = 70;
         const screenWidth = 800;
@@ -90,48 +29,52 @@ class MainScene extends Phaser.Scene {
             platforms.create(x + tileWidth / 2, 568, 'ground').setScale(1).refreshBody();
         }
 
-        // Анимации персонажа
-        this.anims.create({
-            key: 'run',
-            frames: [
-                { key: 'run0' },
-                { key: 'run1' },
-                { key: 'run2' }
-            ],
-            frameRate: 10,
-            repeat: -1
-        });
+        // Машинка игрока
+        this.playerCar = this.physics.add.sprite(100, 200, 'car1');
+        this.playerCar.setAngle(-90);  // Повернуть на -90 градусов
+        this.playerCar.setCollideWorldBounds(true);
+        this.physics.add.collider(this.playerCar, platforms);
+        // this.playerCar.body.allowGravity = false;
 
-        // Персонаж
-        this.player = this.physics.add.sprite(100, 450, 'run0').setScale(0.5);
-        this.player.setCollideWorldBounds(true);
-        this.physics.add.collider(this.player, platforms);
-        this.player.play('run');
+        // Машинка с ИИ
+        this.aiCar = this.physics.add.sprite(500, 200, 'car2');
+        this.aiCar.setAngle(-90);      // То же самое, если нужно
+        this.aiCar.setCollideWorldBounds(true);
+        this.physics.add.collider(this.aiCar, platforms);
+        this.aiCar.body.allowGravity = false;
 
-        // Управление
+        // Вектор направления для AI-машинки (1 — вправо, -1 — влево)
+        this.aiDirection = 1;
+
+        // Настраиваем клавиатуру для управления
         this.cursors = this.input.keyboard.createCursorKeys();
     }
 
     update() {
+        // Управление машинкой игрока
         if (this.cursors.left.isDown) {
-            this.player.setVelocityX(-150);
-            this.player.anims.play('run', true);
-            this.player.flipX = true;
+            this.playerCar.setVelocityX(-350);
         } else if (this.cursors.right.isDown) {
-            this.player.setVelocityX(150);
-            this.player.anims.play('run', true);
-            this.player.flipX = false;
+            this.playerCar.setVelocityX(150);
         } else {
-            this.player.setVelocityX(0);
-            this.player.anims.stop();
+            this.playerCar.setVelocityX(0);
         }
 
-        if (this.cursors.up.isDown && this.player.body.touching.down) {
-            this.player.setVelocityY(-350); // Прыжок
+        // Простая логика для машинки с ИИ:
+        // Двигаем в текущем направлении
+        this.aiCar.setVelocityX(100 * this.aiDirection);
+
+        // Если доехали до правого края — меняем направление на влево
+        if (this.aiCar.x >= 700) {
+            this.aiDirection = -1;
+        }
+        // Если доехали до левого края — меняем направление на вправо
+        else if (this.aiCar.x <= 100) {
+            this.aiDirection = 1;
         }
 
-        // Двигаем фон
-        this.background.tilePositionY - 2; // Прокрутка по горизонтали
+        // Прокрутка фона вертикально
+        this.background.tilePositionY -= 2; // Скорость прокрутки, можно настроить по желанию
     }
 }
 
@@ -147,7 +90,7 @@ const config = {
             debug: false
         }
     },
-    scene: [IntroScene, MainScene], // Добавляем обе сцены
+    scene: [MainScene], // Только основная сцена
 };
 
 const game = new Phaser.Game(config);
