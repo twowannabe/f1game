@@ -1,80 +1,132 @@
 class MainScene extends Phaser.Scene {
     constructor() {
-        super({ key: 'MainScene'    });
+        super({ key: 'MainScene' });
     }
 
     preload() {
-        // Загрузка ресурсов
-        this.load.image('ground', 'assets/medievalTile_002.png');
-
-        // Две машинки (замените пути к своим файлам)
-        this.load.image('car1', 'assets/car1.png');
-        this.load.image('car2', 'assets/car2.png');
-
-        // Загрузка фона
-        this.load.image('background', 'assets/trainroad.png');
+        console.log('Загрузка ресурсов...');
+        this.load.image('car1', 'assets/car1.png'); // Машина игрока
+        this.load.image('car2', 'assets/car2.png'); // Машина AI
+        this.load.image('background', 'assets/trainroad.png'); // Задний фон
     }
 
     create() {
-        // Фоновое изображение (тайлспрайт для вертикальной прокрутки)
-        this.background = this.add.tileSprite(400, 300, this.sys.game.config.width, this.sys.game.config.height, 'background');
-        this.background.setOrigin(0.5, 0.5);
+        console.log('Создание сцены...');
 
-        // Создаем землю
-        const platforms = this.physics.add.staticGroup();
-        const tileWidth = 70;
-        const screenWidth = 800;
+        // === Фон ===
+        this.background = this.add.tileSprite(
+            400, 300, 800, 600, 'background'
+        );
 
-        for (let x = 0; x < screenWidth; x += tileWidth) {
-            platforms.create(x + tileWidth / 2, 568, 'ground').setScale(1).refreshBody();
-        }
-
-        // Машинка игрока
-        this.playerCar = this.physics.add.sprite(100, 200, 'car1');
-        this.playerCar.setAngle(-90);  // Повернуть на -90 градусов
+        // === Машина игрока ===
+        this.playerCar = this.physics.add.sprite(400, 500, 'car1');
+        this.playerCar.setScale(0.5);
+        this.playerCar.setAngle(-90);
         this.playerCar.setCollideWorldBounds(true);
-        this.physics.add.collider(this.playerCar, platforms);
-        // this.playerCar.body.allowGravity = false;
 
-        // Машинка с ИИ
-        this.aiCar = this.physics.add.sprite(500, 200, 'car2');
-        this.aiCar.setAngle(-90);      // То же самое, если нужно
+        // === Машина AI ===
+        this.aiCar = this.physics.add.sprite(600, 500, 'car2');
+        this.aiCar.setScale(0.5);
+        this.aiCar.setAngle(-90);
         this.aiCar.setCollideWorldBounds(true);
-        this.physics.add.collider(this.aiCar, platforms);
-        this.aiCar.body.allowGravity = false;
 
-        // Вектор направления для AI-машинки (1 — вправо, -1 — влево)
-        this.aiDirection = 1;
-
-        // Настраиваем клавиатуру для управления
+        // === Управление ===
         this.cursors = this.input.keyboard.createCursorKeys();
+
+        // === Таймер гонки ===
+        this.raceDuration = 15000; // 15 секунд
+        this.raceElapsed = 0;
+        this.raceFinished = false;
+
+        // === Скорости машин ===
+        this.car1Speed = -200; // Скорость игрока
+        this.car2Speed = -150; // Скорость AI
+
+        // Таймер смены скоростей
+        this.time.addEvent({
+            delay: 5000,
+            callback: () => {
+                this.car1Speed = -150; // Игрок замедляется
+                this.car2Speed = -210; // AI ускоряется
+            },
+            loop: false,
+        });
+
+        this.time.addEvent({
+            delay: 10000,
+            callback: () => {
+                this.car1Speed = -200; // Игрок ускоряется
+                this.car2Speed = -200; // AI замедляется
+            },
+            loop: false,
+        });
+
+        // === Таймер на экран ===
+        this.timerText = this.add.text(16, 16, 'Time: 15', {
+            font: '24px Arial',
+            fill: '#ffffff',
+        });
+
+        console.log('Сцена создана!');
     }
 
-    update() {
-        // Управление машинкой игрока
+    update(time, delta) {
+        if (this.raceFinished) return;
+
+        // === Таймер гонки ===
+        this.raceElapsed += delta;
+        const timeLeft = Math.max(0, Math.ceil((this.raceDuration - this.raceElapsed) / 1000));
+        this.timerText.setText(`Time: ${timeLeft}`);
+
+        // === Управление машиной игрока ===
         if (this.cursors.left.isDown) {
-            this.playerCar.setVelocityX(-350);
+            this.playerCar.x -= 250 * (delta / 1000);
         } else if (this.cursors.right.isDown) {
-            this.playerCar.setVelocityX(150);
-        } else {
-            this.playerCar.setVelocityX(0);
+            this.playerCar.x += 250 * (delta / 1000);
         }
 
-        // Простая логика для машинки с ИИ:
-        // Двигаем в текущем направлении
-        this.aiCar.setVelocityX(100 * this.aiDirection);
+        // === Движение машин ===
+        this.playerCar.y += this.car1Speed * (delta / 1000);
+        this.aiCar.y += this.car2Speed * (delta / 1000);
 
-        // Если доехали до правого края — меняем направление на влево
-        if (this.aiCar.x >= 700) {
-            this.aiDirection = -1;
-        }
-        // Если доехали до левого края — меняем направление на вправо
-        else if (this.aiCar.x <= 100) {
-            this.aiDirection = 1;
+        // === Проверка на выход за пределы ===
+        if (this.playerCar.y <= 100) {
+            this.playerCar.y = 500; // Вернуть на начальную высоту
         }
 
-        // Прокрутка фона вертикально
-        this.background.tilePositionY -= 2; // Скорость прокрутки, можно настроить по желанию
+        if (this.aiCar.y <= 100) {
+            this.aiCar.y = 500; // Вернуть на начальную высоту
+        }
+
+        // === Прокрутка фона ===
+        this.background.tilePositionY += Math.abs(this.car1Speed) * (delta / 1000);
+
+        // === Проверка завершения гонки ===
+        if (this.raceElapsed >= this.raceDuration) {
+            this.endRace();
+        }
+    }
+
+    endRace() {
+        console.log('Гонка завершена!');
+        this.raceFinished = true;
+
+        // Остановка машин
+        this.playerCar.setVelocity(0);
+        this.aiCar.setVelocity(0);
+
+        // Определение победителя
+        const winner = this.playerCar.y < this.aiCar.y ? 'Player' : 'AI';
+        const resultText = `Finished!\nWinner: ${winner}`;
+
+        // Вывод результата
+        this.add.text(400, 300, resultText, {
+            font: '24px Arial',
+            fill: '#ffffff',
+            align: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            padding: { x: 20, y: 20 },
+        }).setOrigin(0.5);
     }
 }
 
@@ -86,11 +138,11 @@ const config = {
     physics: {
         default: 'arcade',
         arcade: {
-            gravity: { y: 500 },
-            debug: false
-        }
+            gravity: { y: 0 }, // Без гравитации
+            debug: false,
+        },
     },
-    scene: [MainScene], // Только основная сцена
+    scene: [MainScene],
 };
 
 const game = new Phaser.Game(config);
